@@ -1,0 +1,142 @@
+<html>
+<head><title>Spoons 2</title></head>
+<body>
+<div id="diOut"></div>
+<script>
+
+var lineOff = 256;
+var buf=[];
+
+Object.defineProperties(buf, { setVal: { value({x, y}, v) { this[x + y * lineOff] = v; } }, getVal: { value({x, y}) { return this[x + y * lineOff];} }});
+
+var curSz=2;
+
+buf.setVal({x:0,y:0},1);
+buf.setVal({x:1,y:0},1);
+buf.setVal({x:0,y:1},1);
+
+
+function* iterate(n) {
+    for (let j = 0; j < n; ++j) {
+		const maxI = (j >= n/2) ? n/2 : n;
+        for (let i = 0; i < maxI; ++i) {
+            yield [ i, j ];
+        }
+    }
+}
+
+function expand(){
+	 var indOff=curSz**2 / 4 ,tmp;
+	var sz=curSz*2,s=curSz/2;
+	if (sz>lineOff) throw "need bigger buffer"; //TODO: auto quadruple buffer size
+	 tmp=indOff;
+	for (var [i, j] of iterate(curSz) ){
+		var [i2,j2] = [i + s, j+ s];
+		var c=buf.getVal({x:i,y:j});
+		c+=tmp;
+		buf.setVal({x:i2,y:j2},  c);
+	}
+	 tmp+=indOff;
+	for (var [i, j] of iterate(curSz) ){
+		var [i2,j2] = [-j + s*4-1, i];
+		var c=buf.getVal({x:i,y:j});
+		c+=tmp;
+		buf.setVal({x:i2,y:j2},  c);
+	}
+	 tmp+=indOff;
+	for (var [i, j] of iterate(curSz) ){
+		var [i2,j2] = [j, -i+ s*4-1];
+		var c=buf.getVal({x:i,y:j});
+		c+=tmp;
+		buf.setVal({x:i2,y:j2},  c);
+	}
+	curSz=sz;
+}
+
+function colorize(arg) {
+    const nbRegions = curSz **2 / 4;
+
+    // graphe d'adjacence préalloué
+    const graph = Array.from(
+    	{ length: nbRegions + 1 },
+		() => new Set()
+	);
+	function addEdge(a, b) {
+		if (a === 0 || b === 0 || a === b) return;
+		graph[a].add(b);
+		graph[b].add(a);
+	}
+
+	// Construction du graphe
+	for (let [x,y] of iterate(curSz)) {
+		const a = arg.getVal({x:x,y:y});
+		const b = arg.getVal({x:x+1,y:y});
+		const c = arg.getVal({x:x,y:y+1});
+		if (b) addEdge(a, b);
+		if (c) addEdge(a, c);
+	}
+
+	// Régions triées par nombre de voisins décroissant
+	const regions = [];
+	for (let i = 1; i <= nbRegions; i++) regions.push(i);
+	regions.sort((a, b) =>
+		graph[b].size - graph[a].size
+	);
+
+	// Couleurs par région
+	const regionColor = new Array(nbRegions + 1).fill(0);
+
+	for (const region of regions) {
+		const used = new Set();
+		for (const neigh of graph[region]) {
+			const c = regionColor[neigh];
+			if (c) used.add(c);
+		}
+		let color = 1;
+		while (used.has(color)) color++;
+		regionColor[region] = color;
+	}
+
+	// Buffer résultat
+	const out = [];
+	Object.defineProperties(out, { setVal: { value({x, y}, v) { this[x + y * lineOff] = v; } }, getVal: { value({x, y}) { return this[x + y * lineOff];} }});
+
+	for (let y = 0; y < curSz; y++) {
+		for (let x = 0; x < curSz; x++) {
+			const region = arg.getVal({x:x,y:y});
+			out.setVal({x:x,y:y},region ? regionColor[region] : 0);
+		}
+	}
+
+	return out;
+}
+
+
+function str(x){ return x==null?" ":String(x);}
+function display(){
+	var txt="", tmp=0, sep;
+	for (var j=0;j<curSz;++j) {
+	  for (var i=0;i<curSz;++i) {
+		tmp= Math.max(tmp, str(buf.getVal({x:i,y:j})).length);
+	}}
+
+	for (var j=0;j<curSz/2;++j) {
+	  sep="";
+	  for (var i=0;i<curSz;++i) {
+		txt+= sep + str(buf.getVal({x:i,y:j})).padStart(tmp," ");
+		sep="\t";
+	}txt+="\n";}
+	console.log(txt);
+}
+expand();
+expand();
+expand();
+// expand();
+// expand();
+// expand();
+buf=colorize(buf);
+display();
+
+</script>
+</body>
+</html>
